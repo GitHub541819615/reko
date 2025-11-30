@@ -21,7 +21,8 @@ App({
     //   优先级：配置文件 > 此处配置 > 默认环境
     env: cloudConfig ? cloudConfig.CLOUD_ENV_ID : "reko-5glgo90ia081c088", // 请在此处填入你的云开发环境ID，例如: "your-env-id"
     userInfo: null,
-    isCloudInit: false // 云开发初始化状态
+    isCloudInit: false, // 云开发初始化状态
+    isLogin: false // 登录状态
   },
 
   /**
@@ -30,6 +31,9 @@ App({
   onLaunch: function () {
     console.log('小程序启动');
     this.initCloud();
+    // 云开发初始化成功后，检查登录状态
+    // 注意：如果需要启动时自动跳转登录页，可以在 checkLoginStatus 后调用
+    this.checkLoginStatus();
   },
 
   /**
@@ -70,6 +74,14 @@ App({
       // 延迟验证云开发环境，避免阻塞启动
       setTimeout(() => {
         this.checkCloudEnvironment();
+        // 云开发初始化成功后，检查登录状态并尝试自动登录
+        this.checkLoginStatus();
+        // 如果未登录，可以尝试自动登录（不强制跳转）
+        if (!this.globalData.isLogin) {
+          this.autoLogin().catch(err => {
+            console.log('自动登录失败，用户需要手动登录');
+          });
+        }
       }, 500);
     } catch (error) {
       console.error('云开发初始化失败:', error);
@@ -175,5 +187,232 @@ App({
    */
   isCloudReady: function () {
     return this.globalData.isCloudInit;
+  },
+
+  /**
+   * 检查登录状态
+   * @param {boolean} autoJumpToLogin - 如果未登录是否自动跳转到登录页（默认false）
+   */
+  checkLoginStatus: function (autoJumpToLogin = false) {
+    try {
+      const token = wx.getStorageSync('token');
+      const userInfo = wx.getStorageSync('userInfo');
+      
+      if (token && userInfo) {
+        this.globalData.userInfo = userInfo;
+        this.globalData.isLogin = true;
+        console.log('用户已登录:', userInfo.nickname);
+        return true;
+      } else {
+        this.globalData.userInfo = null;
+        this.globalData.isLogin = false;
+        
+        // 如果需要自动跳转登录页
+        if (autoJumpToLogin) {
+          const { navigateToLogin } = require('./utils/auth.js');
+          navigateToLogin();
+        }
+        
+        return false;
+      }
+    } catch (error) {
+      console.error('检查登录状态失败:', error);
+      this.globalData.isLogin = false;
+      return false;
+    }
+  },
+
+  /**
+   * 自动登录
+   * @returns {Promise} 登录结果
+   */
+  autoLogin: async function () {
+    try {
+      // 如果已经登录，直接返回
+      if (this.globalData.isLogin && this.globalData.userInfo) {
+        return {
+          success: true,
+          data: {
+            userInfo: this.globalData.userInfo
+          }
+        };
+      }
+
+      // 检查云开发是否已初始化
+      if (!this.globalData.isCloudInit) {
+        throw new Error('云开发未初始化');
+      }
+
+      // 动态导入 auth 工具
+      const { wxLogin } = require('./utils/auth.js');
+      const loginRes = await wxLogin();
+
+      if (loginRes.success) {
+        this.globalData.userInfo = loginRes.data.userInfo;
+        this.globalData.isLogin = true;
+        console.log('自动登录成功:', loginRes.data.userInfo.nickname);
+      } else {
+        this.globalData.isLogin = false;
+      }
+
+      return loginRes;
+    } catch (error) {
+      console.error('自动登录失败:', error);
+      this.globalData.isLogin = false;
+      return {
+        success: false,
+        error: error.message || '自动登录失败'
+      };
+    }
+  },
+
+  /**
+   * 退出登录
+   */
+  logout: function () {
+    try {
+      const { logout } = require('./utils/auth.js');
+      logout();
+      this.globalData.userInfo = null;
+      this.globalData.isLogin = false;
+      console.log('用户已退出登录');
+      return {
+        success: true
+      };
+    } catch (error) {
+      console.error('退出登录失败:', error);
+      return {
+        success: false,
+        error: error.message || '退出登录失败'
+      };
+    }
+  },
+
+  /**
+   * 统一的云函数调用方法（带权限拦截）
+   * @param {string} name - 云函数名称
+   * @param {object} data - 调用参数
+   * @param {object} options - 选项 {skipAuth: boolean, requiredPoints: number}
+   * @returns {Promise} 调用结果
+   */
+  callCloudFunction: function (name, data = {}, options = {}) {
+    return new Promise((resolve, reject) => {
+      // 检查云开发是否已初始化
+      if (!this.globalData.isCloudInit) {
+        reject(new Error('云开发未初始化'));
+        return;
+      }
+
+      // 获取本地存储的token
+      const token = wx.getStorageSync('token');
+      const userInfo = wx.getStorageSync('userInfo');
+
+      // 如果需要认证且没有token，检查是否需要跳过认证
+      if (!options.skipAuth && !token) {
+        // 尝试自动登录
+        this.autoLogin().then(loginRes => {
+          if (loginRes.success) {
+            // 登录成功，重新调用
+            this.callCloudFunction(name, data, options).then(resolve).catch(reject);
+          } else {
+            // 登录失败，跳转到登录页
+            wx.removeStorageSync('token');
+            wx.removeStorageSync('userInfo');
+            this.globalData.userInfo = null;
+            this.globalData.isLogin = false;
+            
+            wx.redirectTo({
+              url: '/pages/login/index',
+              fail: () => {
+                wx.showToast({
+                  title: '请先登录',
+                  icon: 'none'
+                });
+              }
+            });
+            
+            reject(new Error('请重新登录'));
+          }
+        }).catch(reject);
+        return;
+      }
+
+      // 构建调用参数，自动添加token
+      const callData = {
+        ...data
+      };
+
+      // 如果需要认证，添加token
+      if (!options.skipAuth && token) {
+        callData.token = token;
+      }
+
+      // 如果需要权限检查，添加所需积分
+      if (options.requiredPoints !== undefined) {
+        callData.requiredPoints = options.requiredPoints;
+      }
+
+      // 调用云函数
+      wx.cloud.callFunction({
+        name: name,
+        data: callData,
+        success: (res) => {
+          // 检查返回结果中的错误码
+          if (res.result) {
+            // 处理401错误（未授权）
+            if (res.result.code === 401 || res.result.errCode === 401) {
+              // Token过期，清除本地存储并跳转到登录页
+              wx.removeStorageSync('token');
+              wx.removeStorageSync('userInfo');
+              this.globalData.userInfo = null;
+              this.globalData.isLogin = false;
+              
+              wx.redirectTo({
+                url: '/pages/login/index',
+                fail: () => {
+                  wx.showToast({
+                    title: '登录已过期，请重新登录',
+                    icon: 'none'
+                  });
+                }
+              });
+              
+              reject(new Error(res.result.message || '请重新登录'));
+              return;
+            }
+            
+            // 处理403错误（权限不足）
+            if (res.result.code === 403 || res.result.errCode === 403) {
+              wx.showToast({
+                title: res.result.message || '权限不足',
+                icon: 'none',
+                duration: 2000
+              });
+              reject(new Error(res.result.message || '权限不足'));
+              return;
+            }
+          }
+          
+          // 成功返回
+          resolve(res.result || res);
+        },
+        fail: (err) => {
+          console.error('云函数调用失败:', err);
+          
+          // 处理网络错误或其他错误
+          if (err.errMsg && err.errMsg.includes('permission')) {
+            // 权限错误
+            wx.showToast({
+              title: '权限不足',
+              icon: 'none'
+            });
+            reject(new Error('权限不足'));
+          } else {
+            // 其他错误
+            reject(err);
+          }
+        }
+      });
+    });
   }
 });

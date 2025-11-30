@@ -1,5 +1,8 @@
 {
   "navigationBarTitleText": "我的衣橱",
   "enablePullDownRefresh": true,
-  "usingComponents": {}
+  "usingComponents": {
+    "skeleton": "/components/skeleton/index",
+    "empty-state": "/components/empty-state/index"
+  }
 }

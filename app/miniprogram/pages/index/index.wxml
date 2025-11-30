@@ -3,7 +3,79 @@
   <!-- 顶部标题区域 -->
   <view class="header-section">
     <view class="header-title">我的衣橱</view>
-    <view class="header-subtitle">共 {{items.length}} 件衣物</view>
+    <view class="header-subtitle">共 {{insights.totalCount}} 件衣物</view>
+  </view>
+
+  <!-- 数据洞察面板 -->
+  <view wx:if="{{!isEmpty && !loading}}" class="insights-panel">
+    <view class="insights-header">
+      <text class="insights-title">衣橱洞察</text>
+    </view>
+    
+    <!-- 总数统计 -->
+    <view class="insight-card total-card">
+      <view class="insight-label">衣物总数</view>
+      <view class="insight-value">{{insights.totalCount}}</view>
+      <view class="insight-unit">件</view>
+    </view>
+
+    <!-- 分类统计 -->
+    <view wx:if="{{insights.categoryStats.length > 0}}" class="category-stats">
+      <view class="stats-header">
+        <text class="stats-title">分类统计</text>
+      </view>
+      <view class="stats-list">
+        <view 
+          class="stat-item" 
+          wx:for="{{insights.categoryStats}}" 
+          wx:key="category"
+        >
+          <view class="stat-category">{{item.category}}</view>
+          <view class="stat-info">
+            <text class="stat-count">{{item.count}}件</text>
+            <text class="stat-percentage">{{item.percentage}}%</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 购物建议 -->
+    <view wx:if="{{insights.shoppingSuggestions.length > 0}}" class="shopping-suggestions">
+      <view class="suggestions-header">
+        <text class="suggestions-title">💡 购物建议</text>
+      </view>
+      <view class="suggestions-list">
+        <view 
+          class="suggestion-item" 
+          wx:for="{{insights.shoppingSuggestions}}" 
+          wx:key="index"
+        >
+          <text class="suggestion-text">{{item.message}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 标签筛选器 -->
+  <view wx:if="{{!isEmpty && !loading}}" class="filter-section">
+    <view class="filter-header">
+      <text class="filter-title">🏷️ 标签筛选</text>
+      <text wx:if="{{selectedFilterTags.length > 0}}" class="clear-filter" bindtap="clearFilters">清除</text>
+    </view>
+    <view class="filter-tags">
+      <view 
+        class="filter-tag {{selectedFilterTags.indexOf(tag) !== -1 ? 'active' : ''}}"
+        wx:for="{{allTags}}"
+        wx:key="*this"
+        data-tag="{{item}}"
+        bindtap="toggleFilterTag"
+      >
+        <text>{{item}}</text>
+      </view>
+    </view>
+    <view wx:if="{{selectedFilterTags.length > 0}}" class="filter-result">
+      <text>已选择 {{selectedFilterTags.length}} 个标签，显示 {{filteredItems.length}} 件衣物</text>
+    </view>
   </view>
 
   <!-- 快速操作按钮 -->
@@ -12,36 +84,102 @@
       <text class="button-icon">+</text>
       <text>添加衣物</text>
     </button>
+    <view class="secondary-buttons">
+      <button class="secondary-button" bindtap="goToInspiration">
+        <text class="button-icon">✨</text>
+        <text>穿搭灵感</text>
+      </button>
+      <button class="secondary-button" bindtap="goToOutfits">
+        <text class="button-icon">📋</text>
+        <text>我的搭配</text>
+      </button>
+    </view>
   </view>
 
   <!-- 衣物网格列表 -->
   <view class="items-section">
-    <view wx:if="{{loading}}" class="loading-state">
-      <text class="loading-text">加载中...</text>
-    </view>
+    <skeleton wx:if="{{loading}}" type="grid" count="6"></skeleton>
     
-    <view wx:elif="{{isEmpty}}" class="empty-state">
-      <image class="empty-image" src="/images/default-goods-image.png" mode="aspectFit"></image>
-      <text class="empty-text">还没有衣物，快去添加吧~</text>
-      <button class="primary-button empty-button" bindtap="goToAddItem">添加第一件衣物</button>
-    </view>
+    <empty-state 
+      wx:elif="{{isEmpty}}"
+      icon="👗"
+      name="小蔻"
+      title="衣橱空空如也"
+      text="快去添加第一件心爱衣物吧！"
+      button-text="添加第一件衣物"
+      bind:action="goToAddItem"
+    ></empty-state>
 
     <view wx:else class="items-grid">
       <view 
-        class="item-card" 
-        wx:for="{{items}}" 
+        class="item-card {{selectionMode && selectedItemIds.indexOf(item.id) !== -1 ? 'selected' : ''}}"
+        wx:for="{{filteredItems}}"
         wx:key="id"
         data-id="{{item.id}}"
-        bindtap="viewItemDetail"
+        bindtap="{{selectionMode ? 'toggleItemSelection' : 'viewItemDetail'}}"
       >
         <view class="item-image-wrapper">
-          <image class="item-image" src="{{item.imageUrl || '/images/default-goods-image.png'}}" mode="aspectFill"></image>
+          <image 
+            class="item-image" 
+            src="{{item.imageUrl || '/images/default-goods-image.png'}}" 
+            mode="aspectFill"
+            binderror="onImageError"
+            data-index="{{index}}"
+          ></image>
+          <view wx:if="{{selectionMode && selectedItemIds.indexOf(item.id) !== -1}}" class="item-selected-overlay">
+            <view class="item-selected-badge">
+              <text>✓</text>
+            </view>
+          </view>
+          <!-- 删除菜单按钮 -->
+          <view 
+            wx:if="{{!selectionMode}}"
+            class="item-menu-btn"
+            data-id="{{item.id}}"
+            catchtap="showItemMenu"
+          >
+            <text class="menu-icon">⋮</text>
+          </view>
         </view>
         <view class="item-info">
           <text class="item-name">{{item.name}}</text>
-          <text class="item-category">{{item.category}}</text>
+          <view class="item-tags">
+            <view 
+              class="item-tag"
+              wx:for="{{item.tags}}"
+              wx:for-item="tag"
+              wx:key="*this"
+            >
+              <text>{{tag}}</text>
+            </view>
+          </view>
         </view>
       </view>
+    </view>
+    
+    <!-- 操作菜单弹窗 -->
+    <view wx:if="{{showMenu}}" class="menu-modal-mask" catchtap="hideItemMenu">
+      <view class="menu-modal-content" catchtap="">
+        <view class="menu-item" data-action="edit" bindtap="handleMenuAction">
+          <text class="menu-icon">✏️</text>
+          <text class="menu-text">编辑</text>
+        </view>
+        <view class="menu-item menu-item-danger" data-action="delete" bindtap="handleMenuAction">
+          <text class="menu-icon">🗑️</text>
+          <text class="menu-text">删除</text>
+        </view>
+        <view class="menu-cancel" catchtap="hideItemMenu">
+          <text>取消</text>
+        </view>
+      </view>
+    </view>
+    
+    <!-- 多选模式底部操作栏 -->
+    <view wx:if="{{selectionMode && selectedItemIds.length > 0}}" class="selection-actions">
+      <button class="create-outfit-btn" bindtap="createOutfitFromSelection">
+        <text class="button-icon">🎨</text>
+        <text>生成搭配卡片 ({{selectedItemIds.length}})</text>
+      </button>
     </view>
   </view>
 </view>

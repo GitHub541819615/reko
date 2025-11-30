@@ -1,7 +1,13 @@
 {
   "pages": [
     "pages/index/index",
-    "pages/add-item/index"
+    "pages/login/index",
+    "pages/add-item/index",
+    "pages/item-edit/index",
+    "pages/inspiration/index",
+    "pages/template-apply/index",
+    "pages/outfit-creator/index",
+    "pages/outfits/index"
   ],
   "window": {
     "backgroundColor": "#F6F6F6",

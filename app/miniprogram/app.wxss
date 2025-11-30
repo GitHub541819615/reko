@@ -1,4 +1,74 @@
 /**app.wxss**/
+/* ============================================
+   设计系统 - CSS 变量定义
+   ============================================ */
+page {
+  /* 颜色系统 */
+  --color-primary: #F8BBD9;           /* 主粉色 */
+  --color-primary-light: #FFF5F9;     /* 浅粉色背景 */
+  --color-primary-dark: #F5A3C7;       /* 深粉色 */
+  --color-background: #FEFEFE;         /* 背景白 */
+  --color-background-gray: #F8F8F8;   /* 浅灰背景 */
+  --color-text-primary: #333333;       /* 主要文字 */
+  --color-text-secondary: #666666;      /* 次要文字 */
+  --color-text-tertiary: #999999;      /* 三级文字 */
+  --color-border: #F0F0F0;              /* 边框颜色 */
+  --color-border-light: #E0E0E0;        /* 浅边框 */
+  
+  /* 圆角系统 */
+  --border-radius-sm: 8rpx;            /* 小圆角 */
+  --border-radius-md: 12rpx;           /* 中圆角 */
+  --border-radius-lg: 16rpx;           /* 大圆角 */
+  --border-radius-card: 24rpx;          /* 卡片圆角 */
+  --border-radius-button: 24rpx;        /* 按钮圆角 */
+  --border-radius-round: 50%;           /* 圆形 */
+  
+  /* 阴影系统 */
+  --shadow-sm: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4rpx 16rpx rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 8rpx 32rpx rgba(0, 0, 0, 0.08);
+  --shadow-hover: 0 12rpx 40rpx rgba(0, 0, 0, 0.12);
+  
+  /* 间距系统 */
+  --spacing-xs: 8rpx;
+  --spacing-sm: 12rpx;
+  --spacing-md: 16rpx;
+  --spacing-lg: 20rpx;
+  --spacing-xl: 24rpx;
+  --spacing-2xl: 30rpx;
+  --spacing-3xl: 40rpx;
+  --spacing-4xl: 50rpx;
+  
+  /* 字体系统 */
+  --font-size-xs: 22rpx;
+  --font-size-sm: 24rpx;
+  --font-size-md: 28rpx;
+  --font-size-lg: 32rpx;
+  --font-size-xl: 36rpx;
+  --font-size-2xl: 40rpx;
+  --font-size-3xl: 48rpx;
+  --font-size-4xl: 64rpx;
+  
+  /* 行高系统 */
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.6;
+  --line-height-loose: 1.8;
+  
+  /* 过渡动画 */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.3s ease;
+  
+  /* 页面基础样式 */
+  background: var(--color-background-gray);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+}
+
+/* 通用容器 */
 .container {
   display: flex;
   flex-direction: column;
@@ -6,22 +76,115 @@
   box-sizing: border-box;
 } 
 
+/* 按钮重置 */
 button {
   background: initial;
+  padding: 0;
+  margin: 0;
+  border: none;
+  outline: none;
 }
 
-button:focus{
+button:focus {
   outline: 0;
 }
 
-button::after{
+button::after {
   border: none;
 }
 
+/* 通用卡片样式 */
+.card {
+  background-color: var(--color-background);
+  border-radius: var(--border-radius-card);
+  box-shadow: var(--shadow-card);
+  transition: all var(--transition-base);
+}
 
-page {
-  background: #f6f6f6;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
+.card:active {
+  transform: scale(0.98);
+  box-shadow: var(--shadow-md);
+}
+
+/* 通用按钮样式 */
+.btn-primary {
+  background-color: var(--color-primary);
+  color: #FFFFFF;
+  border-radius: var(--border-radius-button);
+  font-weight: 500;
+  transition: all var(--transition-base);
+}
+
+.btn-primary:active {
+  background-color: var(--color-primary-dark);
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  background-color: var(--color-background);
+  color: var(--color-primary);
+  border: 2rpx solid var(--color-primary);
+  border-radius: var(--border-radius-button);
+  font-weight: 500;
+  transition: all var(--transition-base);
+}
+
+.btn-secondary:active {
+  background-color: var(--color-primary-light);
+  transform: scale(0.98);
+}
+
+/* 所有按钮统一添加点击动效 */
+button:active {
+  transform: scale(0.98);
+  transition: transform var(--transition-fast);
+}
+
+/* 点赞、发布等核心交互动效 */
+@keyframes heart-beat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+@keyframes publish-pop {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.heart-animation {
+  animation: heart-beat 0.6s ease;
+}
+
+.publish-animation {
+  animation: publish-pop 0.4s ease;
+}
+
+/* 通用输入框样式 */
+.input-base {
+  width: 100%;
+  padding: var(--spacing-lg);
+  border: 2rpx solid var(--color-border-light);
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-md);
+  background-color: var(--color-background);
+  box-sizing: border-box;
+  transition: all var(--transition-base);
+}
+
+.input-base:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4rpx rgba(248, 187, 217, 0.1);
 }
